@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "395482754229",
+    "firebase_url": "https://study-duel-default-rtdb.firebaseio.com",
+    "project_id": "study-duel",
+    "storage_bucket": "study-duel.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:395482754229:android:7edaab8edf74e5330b62fc",
+        "android_client_info": {
+          "package_name": "com.example.studyduel"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "395482754229-jv9kn9ni4td34o60m68t24njr4obkcr0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.studyduel",
+            "certificate_hash": "29396abc170c187627fd0501c65e8f5f1aed5320"
+          }
+        },
+        {
+          "client_id": "395482754229-i9m8uvfq5ue2igckhm0f3oo9cpcqut11.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDBTVx1HVeO_oTVLtjT032C_C89LmuPwEc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "395482754229-i9m8uvfq5ue2igckhm0f3oo9cpcqut11.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
