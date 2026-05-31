@@ -16,6 +16,8 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _usernameCtrl = TextEditingController();
+  final _schoolCtrl = TextEditingController();
+  final _gradeCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -25,6 +27,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _usernameCtrl.dispose();
+    _schoolCtrl.dispose();
+    _gradeCtrl.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
     _confirmCtrl.dispose();
@@ -33,11 +37,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _register() async {
     final username = _usernameCtrl.text.trim();
+    final school = _schoolCtrl.text.trim();
+    final grade = _gradeCtrl.text.trim();
     final email = _emailCtrl.text.trim();
     final pass = _passCtrl.text.trim();
     final confirm = _confirmCtrl.text.trim();
 
-    if (username.isEmpty || email.isEmpty || pass.isEmpty || confirm.isEmpty) {
+    if (username.isEmpty || school.isEmpty || grade.isEmpty || email.isEmpty || pass.isEmpty || confirm.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Semua kolom wajib diisi!')),
       );
@@ -70,6 +76,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         username: username,
         name: username,
         role: 'siswa', // default
+        schoolName: school,
+        grade: grade,
       );
       if (mounted) {
         setState(() => _loading = false);
@@ -126,45 +134,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color.fromARGB(255, 255, 171, 15),
       body: Stack(
         children: [
           // Header banner kuning/gold
           Positioned(
-            top: 0, left: 0, right: 0,
-            child: Container(
-              height: 220,
-              color: AppColors.accentDark,
-              child: SafeArea(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SizedBox(
+              height: 370,
+              child: Stack(
+                children: [
+                  // Background Image
+                  Positioned.fill(
+                    child: Image.asset(
+                      'assets/images/bg_Login_screen.png',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  // Overlay gradien
+                  Positioned.fill(
+                    child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'STUDY DUEL',
-                        style: AppTextStyles.h2.copyWith(
-                          color: Colors.white,
-                          letterSpacing: 2,
-                          fontWeight: FontWeight.w900,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.1),
+                            Colors.black.withValues(alpha: 0.4),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('🧒', style: TextStyle(fontSize: 50)),
-                        SizedBox(width: 8),
-                        Text('👧', style: TextStyle(fontSize: 50)),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -202,6 +206,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       decoration: const InputDecoration(labelText: 'Username',
                           labelStyle: TextStyle(color: AppColors.textHint, fontSize: 14)),
                     ).animate().fadeIn(delay: 150.ms),
+                    const SizedBox(height: 16),
+
+                    TextField(
+                      controller: _schoolCtrl,
+                      style: AppTextStyles.bodyLarge,
+                      decoration: const InputDecoration(labelText: 'Asal Sekolah',
+                          labelStyle: TextStyle(color: AppColors.textHint, fontSize: 14)),
+                    ).animate().fadeIn(delay: 180.ms),
+                    const SizedBox(height: 16),
+
+                    TextField(
+                      controller: _gradeCtrl,
+                      style: AppTextStyles.bodyLarge,
+                      decoration: const InputDecoration(labelText: 'Kelas',
+                          labelStyle: TextStyle(color: AppColors.textHint, fontSize: 14)),
+                    ).animate().fadeIn(delay: 200.ms),
                     const SizedBox(height: 16),
 
                     TextField(
@@ -267,18 +287,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       isLoading: _loading,
                       prefixIcon: Container(
                         width: 22,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: const Center(
-                          child: Text('G',
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.red)),
+                        height: 22, 
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: Image.asset(
+                            'assets/images/logo_google.png',
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                       onPressed: _loginWithGoogle,
@@ -297,7 +312,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               TextSpan(
                                 text: 'Masuk',
                                 style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.primary,
+                                  color: const Color.fromARGB(255, 63, 116, 231),
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),

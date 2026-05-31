@@ -15,4 +15,6 @@ class AppRoutes {
   static const String duelLobby = '/duel/lobby';
   static const String battle = '/duel/battle';
   static const String result = '/duel/result';
+  static const String duelReview = '/duel/review';
+  static const String chat = '/chat';
 }

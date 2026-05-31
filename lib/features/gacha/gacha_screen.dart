@@ -6,6 +6,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/sd_button.dart';
 import 'gacha_result_screen.dart';
 import '../../core/services/firebase_service.dart';
+import '../../core/utils/icon_handler.dart';
 
 // ── Gacha item model ─────────────────────────────────────────────────────────
 
@@ -75,13 +76,11 @@ class _GachaScreenState extends State<GachaScreen>
     );
 
     try {
-      final newTickets = currentTickets - count;
-      await FirebaseService().updateUserField(uid, {'tickets': newTickets});
-
       final List<Map<String, dynamic>> pulled = await FirebaseService().pullGacha(
         bannerId: 'default_banner',
         bannerName: 'Cosmic Gacha',
         cost: 0,
+        ticketCost: count,
         pullCount: count,
       );
 
@@ -97,10 +96,11 @@ class _GachaScreenState extends State<GachaScreen>
 
         return GachaItem(
           name: item['item_name'] ?? 'Item',
-          emoji: item['item_image'] ?? '🎁',
+          emoji: item['item_image'] ?? '',
           rarity: rarityStr,
           color: c,
           category: item['item_type'] ?? 'skin',
+          id: item['item_id'] ?? '',
         );
       }).toList();
 
@@ -128,7 +128,7 @@ class _GachaScreenState extends State<GachaScreen>
 
     if (currentGems < cost) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gems tidak cukup!')),
+        const SnackBar(content: Text('Poin tidak cukup!')),
       );
       return;
     }
@@ -189,9 +189,9 @@ class _GachaScreenState extends State<GachaScreen>
             actions: [
               Row(
                 children: [
-                  _CurrencyChip(icon: '🎟️', value: '$tickets'),
+                  _CurrencyChip(icon: Icons.confirmation_num_rounded, value: '$tickets'),
                   const SizedBox(width: 8),
-                  _CurrencyChip(icon: '💎', value: '$gems'),
+                  _CurrencyChip(icon: Icons.stars_rounded, value: '$gems'),
                   const SizedBox(width: 12),
                 ],
               ),
@@ -203,9 +203,11 @@ class _GachaScreenState extends State<GachaScreen>
               unselectedLabelColor: Colors.white54,
               labelStyle: AppTextStyles.label,
               tabs: const [
-                Tab(text: 'Tiket'),
-                Tab(text: 'Gacha'),
-                Tab(text: 'Milikku'),
+                Tab(
+                  icon: Icon(Icons.confirmation_num_rounded, color: Color(0xFF52B788)),
+                ),
+                Tab(icon: Icon(Icons.auto_awesome_rounded)),
+                Tab(icon: Icon(Icons.inventory_2_rounded)),
               ],
             ),
           ),
@@ -233,8 +235,14 @@ class _GachaScreenState extends State<GachaScreen>
 }
 
 class _CurrencyChip extends StatelessWidget {
-  final String icon, value;
-  const _CurrencyChip({required this.icon, required this.value});
+  final IconData icon;
+  final String value;
+  final Color iconColor;
+  const _CurrencyChip({
+    required this.icon,
+    required this.value,
+    this.iconColor = Colors.white,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -247,7 +255,17 @@ class _CurrencyChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 14)),
+          if (icon == Icons.confirmation_num_rounded)
+            const Icon(Icons.confirmation_num_rounded, color: Color(0xFF52B788), size: 14)
+          else if (icon == Icons.stars_rounded)
+            Image.asset(
+              'assets/images/diamond.png',
+              width: 14,
+              height: 14,
+              fit: BoxFit.contain,
+            )
+          else
+            Icon(icon, color: iconColor, size: 14),
           const SizedBox(width: 4),
           Text(value, style: AppTextStyles.label.copyWith(color: Colors.white)),
         ],
@@ -267,9 +285,9 @@ class _TicketTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final packages = [
-      {'count': 1, 'cost': 100, 'label': '1 Tiket', 'emoji': '🎟️', 'bonus': ''},
-      {'count': 3, 'cost': 280, 'label': '3 Tiket', 'emoji': '🎟️🎟️', 'bonus': 'Hemat 20!'},
-      {'count': 10, 'cost': 850, 'label': '10 Tiket', 'emoji': '🎟️✨', 'bonus': 'Hemat 150!'},
+      {'count': 1, 'cost': 100, 'label': '1 Tiket', 'emoji': 'confirmation_num', 'bonus': ''},
+      {'count': 3, 'cost': 280, 'label': '3 Tiket', 'emoji': 'confirmation_num', 'bonus': 'Hemat 20!'},
+      {'count': 10, 'cost': 850, 'label': '10 Tiket', 'emoji': 'auto_awesome', 'bonus': 'Hemat 150!'},
     ];
 
     return ListView(
@@ -284,7 +302,7 @@ class _TicketTab extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Text('ℹ️', style: TextStyle(fontSize: 24)),
+              const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -307,8 +325,14 @@ class _TicketTab extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Text(p['emoji'] as String,
-                    style: const TextStyle(fontSize: 36)),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF52B788).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.confirmation_num_rounded, color: Color(0xFF52B788), size: 28),
+                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -348,7 +372,12 @@ class _TicketTab extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        const Text('💎', style: TextStyle(fontSize: 14)),
+                        Image.asset(
+                          'assets/images/diamond.png',
+                          width: 14,
+                          height: 14,
+                          fit: BoxFit.contain,
+                        ),
                         const SizedBox(width: 4),
                         Text('${p['cost']}',
                             style: AppTextStyles.label.copyWith(color: Colors.white)),
@@ -383,63 +412,17 @@ class _GachaTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final legendaryLeft = (50 - legendaryPity).clamp(1, 50).toInt();
+    final legendaryProgress = legendaryPity.clamp(0, 50) / 50;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1a0533), Color(0xFF4a0a7a)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.purple.withValues(alpha: 0.4),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                ...List.generate(6, (i) => Positioned(
-                  left: (i * 50.0) % 300,
-                  top: (i * 30.0) % 180,
-                  child: Text(
-                    ['⭐', '✨', '💫', '🌟', '⚡', '💥'][i],
-                    style: const TextStyle(fontSize: 20),
-                  ),
-                )),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('🎰', style: TextStyle(fontSize: 64)),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Cosmic Gacha',
-                      style: AppTextStyles.h2.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      'Dapatkan item langka!',
-                      style: AppTextStyles.bodyMedium.copyWith(color: Colors.white70),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ).animate().fadeIn().scale(duration: 400.ms),
+          
 
           const SizedBox(height: 16),
 
-          // Pity progress bars
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -450,45 +433,14 @@ class _GachaTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Sistem Pity Gacha 🎰',
-                  style: AppTextStyles.label.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
+                Text('Jaminan Pity', style: AppTextStyles.label.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Jaminan Epic (10 Pulls)', style: AppTextStyles.caption.copyWith(color: Colors.white70)),
-                    Text('$epicPity/10', style: AppTextStyles.caption.copyWith(color: AppColors.rarityEpic, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: epicPity / 10,
-                    minHeight: 8,
-                    backgroundColor: Colors.white10,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.rarityEpic),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Jaminan Legendary (50 Pulls)', style: AppTextStyles.caption.copyWith(color: Colors.white70)),
-                    Text('$legendaryPity/50', style: AppTextStyles.caption.copyWith(color: AppColors.rarityLegendary, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: legendaryPity / 50,
-                    minHeight: 8,
-                    backgroundColor: Colors.white10,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.rarityLegendary),
-                  ),
+                _PityGuaranteeCard(
+                  title: '$legendaryLeft lagi dijamin Legendary/Epic',
+                  subtitle: '$legendaryPity/50 pull menuju jaminan utama',
+                  progress: legendaryProgress,
+                  color: AppColors.rarityLegendary,
+                  icon: Icons.workspace_premium_rounded,
                 ),
               ],
             ),
@@ -508,11 +460,11 @@ class _GachaTab extends StatelessWidget {
                 Text('Tingkat Kemunculan',
                     style: AppTextStyles.label.copyWith(color: Colors.white)),
                 const SizedBox(height: 10),
-                _RateRow(label: 'Mythical', emoji: '🌌', rate: '2%', color: AppColors.rarityMythical),
-                _RateRow(label: 'Legendary', emoji: '☀️', rate: '5%', color: AppColors.rarityLegendary),
-                _RateRow(label: 'Epic', emoji: '💜', rate: '13%', color: AppColors.rarityEpic),
-                _RateRow(label: 'Rare', emoji: '💙', rate: '30%', color: AppColors.rarityRare),
-                _RateRow(label: 'Common', emoji: '⬜', rate: '50%', color: AppColors.rarityCommon),
+                _RateRow(label: 'Mythical', icon: Icons.brightness_7_rounded, rate: '2%', color: AppColors.rarityMythical),
+                _RateRow(label: 'Legendary', icon: Icons.workspace_premium_rounded, rate: '5%', color: AppColors.rarityLegendary),
+                _RateRow(label: 'Epic', icon: Icons.stars_rounded, rate: '13%', color: AppColors.rarityEpic),
+                _RateRow(label: 'Rare', icon: Icons.diamond_rounded, rate: '30%', color: AppColors.rarityRare),
+                _RateRow(label: 'Common', icon: Icons.circle_rounded, rate: '50%', color: AppColors.rarityCommon),
               ],
             ),
           ).animate().fadeIn(delay: 200.ms),
@@ -523,7 +475,7 @@ class _GachaTab extends StatelessWidget {
             children: [
               Expanded(
                 child: SdButton(
-                  label: '1x Pull 🎟️',
+                  label: '1x Pull',
                   variant: SdButtonVariant.outline,
                   onPressed: onPull1,
                   height: 52,
@@ -532,7 +484,7 @@ class _GachaTab extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: SdButton(
-                  label: '10x Pull 🎟️',
+                  label: '10x Pull',
                   onPressed: onPull10,
                   height: 52,
                 ),
@@ -540,40 +492,75 @@ class _GachaTab extends StatelessWidget {
             ],
           ).animate().fadeIn(delay: 300.ms),
 
-          const SizedBox(height: 8),
-          Text(
-            'Kamu punya $tickets tiket',
-            style: AppTextStyles.bodySmall.copyWith(color: Colors.white54),
-            textAlign: TextAlign.center,
-          ),
+          
+        ],
+      ),
+    );
+  }
+}
 
-          const SizedBox(height: 16),
-          TextButton.icon(
-            onPressed: () async {
-              final uid = FirebaseService().currentUser?.uid;
-              if (uid != null) {
-                await FirebaseService().updateUserField(uid, {'tickets': tickets + 50});
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Berhasil menambahkan +50 Tiket Gratis! 🎉'),
-                      backgroundColor: AppColors.success,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              }
-            },
-            icon: const Icon(Icons.card_giftcard_rounded, color: Color(0xFFFFC107)),
-            label: Text(
-              'Butuh tiket tambahan? Dapatkan 50 Tiket Gratis',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: const Color(0xFFFFC107),
-                fontWeight: FontWeight.bold,
-                decoration: TextDecoration.underline,
-              ),
+class _PityGuaranteeCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final double progress;
+  final Color color;
+  final IconData icon;
+
+  const _PityGuaranteeCard({
+    required this.title,
+    required this.subtitle,
+    required this.progress,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
             ),
-          ).animate().fadeIn(delay: 400.ms),
+            child: Icon(icon, color: color, size: 21),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.label.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(subtitle, style: AppTextStyles.caption.copyWith(color: Colors.white60)),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(100),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 7,
+                    backgroundColor: Colors.white12,
+                    valueColor: AlwaysStoppedAnimation(color),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -581,9 +568,10 @@ class _GachaTab extends StatelessWidget {
 }
 
 class _RateRow extends StatelessWidget {
-  final String label, emoji, rate;
+  final String label, rate;
+  final IconData icon;
   final Color color;
-  const _RateRow({required this.label, required this.emoji, required this.rate, required this.color});
+  const _RateRow({required this.label, required this.icon, required this.rate, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -591,7 +579,7 @@ class _RateRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 16)),
+          Icon(icon, size: 16, color: color),
           const SizedBox(width: 8),
           Text(label, style: AppTextStyles.bodyMedium.copyWith(color: color, fontWeight: FontWeight.w700)),
           const Spacer(),
@@ -642,7 +630,7 @@ class _CollectionTabState extends State<_CollectionTab> {
           return GachaItem(
             id: doc.id,
             name: data['item_name'] ?? 'Item',
-            emoji: data['item_image'] ?? '🎁',
+            emoji: data['item_image'] ?? 'inventory_2_rounded',
             rarity: rarityStr,
             color: c,
             category: category,
@@ -710,64 +698,139 @@ class _CollectionTabState extends State<_CollectionTab> {
               ),
               const SizedBox(height: 8),
               if (equippedItem != null)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.darkNavyCard,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: equippedItem.color.withValues(alpha: 0.5), width: 1.5),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 54,
-                        height: 54,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: equippedItem.color, width: 2),
-                        ),
-                        child: Center(
-                          child: Text(equippedItem.emoji, style: const TextStyle(fontSize: 28)),
-                        ),
+                Builder(builder: (context) {
+                  final isPremium = equippedItem.rarity == 'mythical' || equippedItem.rarity == 'legendary';
+                  Widget equippedCard = Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isPremium ? null : AppColors.darkNavyCard,
+                      gradient: isPremium
+                          ? LinearGradient(
+                              colors: equippedItem.rarity == 'mythical'
+                                  ? [const Color(0xFF3A0066), const Color(0xFF1A0033)]
+                                  : [const Color(0xFF664D00), const Color(0xFF332600)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isPremium ? equippedItem.color : equippedItem.color.withValues(alpha: 0.5),
+                        width: isPremium ? 2.0 : 1.5,
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              equippedItem.name,
-                              style: AppTextStyles.bodyLarge.copyWith(color: Colors.white, fontWeight: FontWeight.w900),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              equippedItem.rarity.toUpperCase(),
-                              style: AppTextStyles.caption.copyWith(color: equippedItem.color, fontWeight: FontWeight.bold, fontSize: 10),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.success, width: 1),
-                        ),
-                        child: Text(
-                          'Terpasang',
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.success,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
+                      boxShadow: isPremium
+                          ? [
+                              BoxShadow(
+                                color: equippedItem.color.withValues(alpha: 0.35),
+                                blurRadius: 10,
+                                spreadRadius: 1,
+                              )
+                            ]
+                          : null,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 54,
+                          height: 54,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: equippedItem.color, width: 2),
+                          ),
+                          child: Center(
+                            child: IconHandler.buildItemIcon(equippedItem.emoji, size: 32, color: Colors.white),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                )
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                equippedItem.name,
+                                style: AppTextStyles.bodyLarge.copyWith(color: Colors.white, fontWeight: FontWeight.w900),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                equippedItem.rarity.toUpperCase(),
+                                style: AppTextStyles.caption.copyWith(color: equippedItem.color, fontWeight: FontWeight.bold, fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () async {
+                            try {
+                              await FirebaseService().unequipItem(equippedItem.id, equippedItem.originalType);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('${equippedItem.name} berhasil dilepas!'),
+                                    backgroundColor: AppColors.textSecondary,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Gagal melepas item: $e'),
+                                    backgroundColor: AppColors.error,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.white24, width: 1),
+                            ),
+                            child: Text(
+                              'LEPAS',
+                              style: AppTextStyles.caption.copyWith(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.success.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.success, width: 1),
+                          ),
+                          child: Text(
+                            'Terpasang',
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.success,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (isPremium) {
+                    equippedCard = equippedCard.animate(onPlay: (c) => c.repeat(reverse: true))
+                        .shimmer(duration: 1500.ms, color: Colors.white24)
+                        .scale(begin: const Offset(0.98, 0.98), end: const Offset(1.02, 1.02), duration: 1500.ms);
+                  }
+                  return equippedCard;
+                })
               else
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -801,7 +864,7 @@ class _CollectionTabState extends State<_CollectionTab> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('📦', style: TextStyle(fontSize: 48)),
+                        const Icon(Icons.inventory_2_rounded, size: 48, color: Colors.white24),
                         const SizedBox(height: 12),
                         Text(
                           'Koleksi $_activeFilter Anda kosong!',
@@ -825,16 +888,39 @@ class _CollectionTabState extends State<_CollectionTab> {
                   itemCount: collectionItems.length,
                   itemBuilder: (_, i) {
                     final item = collectionItems[i];
-                    return Container(
+                    final isPremium = item.rarity == 'mythical' || item.rarity == 'legendary';
+                    
+                    Widget gridCard = Container(
                       decoration: BoxDecoration(
-                        color: AppColors.darkNavyCard,
+                        color: isPremium ? null : AppColors.darkNavyCard,
+                        gradient: isPremium
+                            ? LinearGradient(
+                                colors: item.rarity == 'mythical'
+                                    ? [const Color(0xFF3A0066), const Color(0xFF1A0033)]
+                                    : [const Color(0xFF664D00), const Color(0xFF332600)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : null,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: item.color.withValues(alpha: 0.3), width: 1.5),
+                        border: Border.all(
+                          color: isPremium ? item.color : item.color.withValues(alpha: 0.3),
+                          width: isPremium ? 2.0 : 1.5,
+                        ),
+                        boxShadow: isPremium
+                            ? [
+                                BoxShadow(
+                                  color: item.color.withValues(alpha: 0.35),
+                                  blurRadius: 10,
+                                  spreadRadius: 1,
+                                )
+                              ]
+                            : null,
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(item.emoji, style: const TextStyle(fontSize: 32)),
+                          IconHandler.buildItemIcon(item.emoji, size: 36, color: Colors.white),
                           const SizedBox(height: 6),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -874,7 +960,7 @@ class _CollectionTabState extends State<_CollectionTab> {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('${item.name} berhasil dipasang! 🎉'),
+                                      content: Text('${item.name} berhasil dipasang!'),
                                       backgroundColor: AppColors.success,
                                       behavior: SnackBarBehavior.floating,
                                     ),
@@ -910,11 +996,19 @@ class _CollectionTabState extends State<_CollectionTab> {
                           ),
                         ],
                       ),
-                    ).animate()
-                            .fadeIn(delay: Duration(milliseconds: 80 * i))
-                            .scale(delay: Duration(milliseconds: 80 * i), duration: 300.ms);
-                      },
-                    ),
+                    );
+
+                    if (isPremium) {
+                      gridCard = gridCard.animate(onPlay: (c) => c.repeat(reverse: true))
+                          .shimmer(duration: 1500.ms, color: Colors.white24)
+                          .scale(begin: const Offset(0.97, 0.97), end: const Offset(1.03, 1.03), duration: 1200.ms);
+                    }
+
+                    return gridCard.animate()
+                        .fadeIn(delay: Duration(milliseconds: 80 * i))
+                        .scale(delay: Duration(milliseconds: 80 * i), duration: 300.ms);
+                  },
+                ),
               ],
             ),
           );

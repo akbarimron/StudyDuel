@@ -11,9 +11,11 @@ import 'features/home/home_screen.dart';
 import 'features/duel/duel_lobby_screen.dart';
 import 'features/duel/battle_screen.dart';
 import 'features/duel/result_screen.dart';
+import 'features/duel/duel_review_screen.dart';
 
 import 'features/friends/friends_screen.dart';
 import 'features/friends/other_profile_screen.dart';
+import 'features/friends/chat_screen.dart';
 import 'features/profile/settings_screen.dart';
 import 'features/profile/badges_list_screen.dart';
 
@@ -42,6 +44,8 @@ class StudyDuelApp extends StatelessWidget {
         AppRoutes.duelLobby: (_) => const DuelLobbyScreen(),
         AppRoutes.battle: (_) => const BattleScreen(),
         AppRoutes.result: (_) => const ResultScreen(),
+        AppRoutes.duelReview: (_) => const DuelReviewScreen(),
+        AppRoutes.chat: (_) => const ChatScreen(),
       },
     );
   }

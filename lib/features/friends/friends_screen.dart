@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/services/firebase_service.dart';
+import '../../core/constants/app_routes.dart';
+import '../../core/utils/icon_handler.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
@@ -124,7 +126,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
             ),
           ),
 
-          // ── Tantangan Masuk (Incoming Friend Requests) ──────────────
+          // ── Permintaan Pertemanan (Incoming Friend Requests) ──────────────
           SliverToBoxAdapter(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: _firebase.getFriendRequests(myUid),
@@ -149,7 +151,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                             child: const Icon(Icons.mail_rounded, color: AppColors.primary, size: 18),
                           ),
                           const SizedBox(width: 10),
-                          Text('Tantangan Masuk', style: AppTextStyles.h3),
+                          Text('Permintaan Pertemanan', style: AppTextStyles.h3),
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -173,7 +175,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                         final fromUid = data['from_uid'] as String? ?? '';
                         final fromName = data['from_name'] as String? ?? 'Pengguna';
                         final fromSchool = data['from_school'] as String? ?? '';
-                        final fromAvatar = data['from_avatar'] as String? ?? '🧑';
+                        final fromAvatar = data['from_avatar'] as String? ?? 'kinz.png';
                         final sentAt = data['sent_at'];
 
                         return Padding(
@@ -189,7 +191,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                               await _firebase.acceptFriendRequest(fromUid);
                               messenger.showSnackBar(
                                 SnackBar(
-                                  content: Text('$fromName ditambahkan sebagai teman! 🎉'),
+                                  content: Text('$fromName ditambahkan sebagai teman!'),
                                   backgroundColor: AppColors.success,
                                   behavior: SnackBarBehavior.floating,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -275,40 +277,66 @@ class _FriendsScreenState extends State<FriendsScreen> {
                         _EmptyFriendsState(hasSearch: _searchQuery.isNotEmpty)
                       else
                         ...List.generate(filtered.length, (i) {
-                          final data = filtered[i].data();
                           final friendUid = filtered[i].id;
-                          final name = data['name'] as String? ?? 'Pelajar';
-                          final avatar = data['avatar_url'] as String? ?? '🧑';
-                          final level = data['level'] as int? ?? 1;
-                          final xp = data['xp'] as int? ?? 0;
-                          final isOnline = data['is_online'] as bool? ?? false;
-                          final school = data['school_name'] as String? ?? '';
+                          return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                            stream: _firebase.getUserStream(friendUid),
+                            builder: (context, friendSnapshot) {
+                              if (!friendSnapshot.hasData) {
+                                return const SizedBox(
+                                  height: 80,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                                    ),
+                                  ),
+                                );
+                              }
+                              final friendData = friendSnapshot.data!.data() ?? {};
+                              final name = friendData['name'] as String? ?? 'Pelajar';
+                              final avatar = friendData['avatar_url'] as String? ?? 'kinz.png';
+                              final level = friendData['level'] as int? ?? 1;
+                              final mmr = friendData['mmr'] as int? ?? 80;
+                              final isOnline = friendData['is_online'] as bool? ?? false;
 
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _FriendCard(
-                              uid: friendUid,
-                              name: name,
-                              avatar: avatar,
-                              level: level,
-                              xp: xp,
-                              isOnline: isOnline,
-                              school: school,
-                              onTap: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/other-profile',
-                                  arguments: friendUid,
-                                );
-                              },
-                              onDuel: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/duel/lobby',
-                                  arguments: {'challengeUid': friendUid, 'challengeName': name},
-                                );
-                              },
-                            ),
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _FriendCard(
+                                  uid: friendUid,
+                                  name: name,
+                                  avatar: avatar,
+                                  level: level,
+                                  mmr: mmr,
+                                  isOnline: isOnline,
+                                  onTap: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      '/other-profile',
+                                      arguments: friendUid,
+                                    );
+                                  },
+                                  onDuel: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      '/duel/lobby',
+                                      arguments: {'challengeUid': friendUid, 'challengeName': name},
+                                    );
+                                  },
+                                  onChat: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      AppRoutes.chat,
+                                      arguments: {
+                                        'friendUid': friendUid,
+                                        'friendName': name,
+                                        'friendAvatar': avatar,
+                                        'isOnline': isOnline,
+                                      },
+                                    );
+                                  },
+                                ),
+                              );
+                            },
                           ).animate().fadeIn(
                                 delay: Duration(milliseconds: 250 + (i * 60)),
                                 duration: 300.ms,
@@ -359,9 +387,6 @@ class _FriendRequestCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: const Border(
-          left: BorderSide(color: AppColors.primaryLight, width: 4),
-        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -381,10 +406,12 @@ class _FriendRequestCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.primarySurface,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.primaryLight, width: 2),
+                border: Border.all(color: AppColors.border, width: 1),
               ),
-              child: Center(
-                child: Text(avatar, style: const TextStyle(fontSize: 22)),
+              child: ClipOval(
+                child: Center(
+                  child: IconHandler.buildItemIcon(avatar, size: 36, color: AppColors.primary),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -496,22 +523,22 @@ class _FriendCard extends StatelessWidget {
   final String name;
   final String avatar;
   final int level;
-  final int xp;
+  final int mmr;
   final bool isOnline;
-  final String school;
   final VoidCallback onTap;
   final VoidCallback onDuel;
+  final VoidCallback onChat;
 
   const _FriendCard({
     required this.uid,
     required this.name,
     required this.avatar,
     required this.level,
-    required this.xp,
+    required this.mmr,
     required this.isOnline,
-    required this.school,
     required this.onTap,
     required this.onDuel,
+    required this.onChat,
   });
 
   @override
@@ -548,7 +575,7 @@ class _FriendCard extends StatelessWidget {
                     ),
                   ),
                   child: Center(
-                    child: Text(avatar, style: const TextStyle(fontSize: 24)),
+                    child: IconHandler.buildItemIcon(avatar, size: 32, color: AppColors.primary),
                   ),
                 ),
                 if (isOnline)
@@ -620,27 +647,39 @@ class _FriendCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '⚡ $xp XP',
-                        style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600),
+                      const SizedBox(width: 8),
+                      const Text(
+                        '•',
+                        style: TextStyle(color: AppColors.textHint, fontSize: 10),
                       ),
-                      if (school.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        const Text('•', style: TextStyle(color: AppColors.textHint, fontSize: 10)),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            school,
-                            style: AppTextStyles.caption,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$mmr MMR',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Chat button
+            GestureDetector(
+              onTap: onChat,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: AppColors.secondary,
+                  size: 20,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -690,9 +729,10 @@ class _EmptyFriendsState extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 40),
         child: Column(
           children: [
-            Text(
-              hasSearch ? '🔍' : '👥',
-              style: const TextStyle(fontSize: 48),
+            Icon(
+              hasSearch ? Icons.search_off_rounded : Icons.person_add_rounded,
+              size: 54,
+              color: AppColors.textHint,
             ),
             const SizedBox(height: 12),
             Text(
@@ -773,7 +813,7 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
         setState(() => _sentRequests.add(targetUid));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Permintaan dikirim ke $targetName! 📨'),
+            content: Text('Permintaan dikirim ke $targetName!'),
             backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -890,13 +930,13 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Text('🔎', style: TextStyle(fontSize: 36)),
-                                  const SizedBox(height: 8),
+                                  const Icon(Icons.person_search_rounded, size: 48, color: AppColors.textHint),
+                                  const SizedBox(height: 12),
                                   Text(
                                     _lastQuery.isEmpty
                                         ? 'Ketik nama untuk mencari'
                                         : 'Tidak ditemukan',
-                                    style: AppTextStyles.bodyMedium,
+                                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
                                   ),
                                 ],
                               ),
@@ -911,7 +951,7 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
                               final uid = user['user_id'] as String? ?? '';
                               final name = user['name'] as String? ?? 'Pengguna';
                               final username = user['username'] as String? ?? '';
-                              final avatar = user['avatar_url'] as String? ?? '🧑';
+                              final avatar = user['avatar_url'] as String? ?? 'kinz.png';
                               final school = user['school_name'] as String? ?? '';
                               final level = user['level'] as int? ?? 1;
                               final isMe = uid == myUid;
@@ -930,7 +970,7 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
                                         border: Border.all(color: AppColors.border),
                                       ),
                                       child: Center(
-                                        child: Text(avatar, style: const TextStyle(fontSize: 20)),
+                                        child: IconHandler.buildItemIcon(avatar, size: 28, color: AppColors.primary),
                                       ),
                                     ),
                                     const SizedBox(width: 12),

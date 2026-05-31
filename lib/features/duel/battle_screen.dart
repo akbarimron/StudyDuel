@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/services/firebase_service.dart';
+import '../../core/utils/icon_handler.dart';
 
 class BattleScreen extends StatefulWidget {
   const BattleScreen({super.key});
@@ -30,10 +31,27 @@ class _BattleScreenState extends State<BattleScreen>
   late String _sessionId;
   late bool _isPlayer1;
   List<Map<String, dynamic>> _battleQuestions = [];
+  List<int?> _userAnswers = [];
   bool _loadingQuestions = true;
   StreamSubscription? _duelSub;
   String _oppName = 'Lawan';
+  String _myAvatar = 'kinz.png';
+  String _oppAvatar = 'kinz.png';
   bool _isBot = false;
+
+  // Smarter Bot simulation parameters
+  bool _botAnsweredThisQuestion = false;
+  int? _botResponseTime;
+  bool? _botCorrect;
+  String _difficulty = 'sedang';
+
+  // Waiting for opponent parameters
+  bool _waitingForOpponent = false;
+  int _oppAnsweredCount = 0;
+  Timer? _waitingTimer;
+  int _waitingTimeLeft = 25;
+  bool _p1Finished = false;
+  bool _p2Finished = false;
 
   @override
   void initState() {
@@ -56,6 +74,22 @@ class _BattleScreenState extends State<BattleScreen>
     }
   }
 
+  void _setupBotForQuestion() {
+    if (!_isBot) return;
+    final r = Random();
+    if (_difficulty == 'mudah') {
+      _botCorrect = r.nextDouble() < 0.50; // 50% accuracy
+      _botResponseTime = 8 + r.nextInt(8); // 8 to 15 seconds
+    } else if (_difficulty == 'sulit') {
+      _botCorrect = true; // 100% accuracy (always correct on hard difficulty)
+      _botResponseTime = 2 + r.nextInt(3); // 2 to 4 seconds
+    } else { // sedang
+      _botCorrect = r.nextDouble() < 0.75; // 75% accuracy
+      _botResponseTime = 4 + r.nextInt(5); // 4 to 8 seconds
+    }
+    _botAnsweredThisQuestion = false;
+  }
+
   void _initBattle() async {
     try {
       final doc = await FirebaseFirestore.instance.collection('duel_sessions').doc(_sessionId).get();
@@ -69,11 +103,47 @@ class _BattleScreenState extends State<BattleScreen>
           ? (data['player2_name'] != '' ? data['player2_name'] : 'Lawan')
           : (data['player1_name'] != '' ? data['player1_name'] : 'Lawan');
 
-      final qList = await FirebaseService().getQuestionsForDuel(subject, diff);
+      // Fetch Avatars
+      String myAvatar = 'kinz.png';
+      String oppAvatar = 'kinz.png';
+      
+      final myUid = FirebaseService().currentUser?.uid;
+      if (myUid != null) {
+        final myDoc = await FirebaseFirestore.instance.collection('users').doc(myUid).get();
+        if (myDoc.exists) {
+          myAvatar = myDoc.data()?['avatar_url'] ?? 'kinz.png';
+        }
+      }
+
+      if (_isBot) {
+        oppAvatar = 'robot';
+      } else {
+        final oppId = _isPlayer1 ? data['player2_id'] : data['player1_id'];
+        if (oppId != null && oppId.toString().isNotEmpty) {
+          final oppDoc = await FirebaseFirestore.instance.collection('users').doc(oppId).get();
+          if (oppDoc.exists) {
+            oppAvatar = oppDoc.data()?['avatar_url'] ?? 'kinz.png';
+          }
+        }
+      }
+
+      List<Map<String, dynamic>> qList = [];
+      if (data['questions'] != null) {
+        final List<dynamic> rawQs = data['questions'];
+        qList = rawQs.map((q) => Map<String, dynamic>.from(q as Map)).toList();
+      } else {
+        qList = await FirebaseService().getQuestionsForDuel(subject, diff);
+      }
+
       if (mounted) {
         setState(() {
+          _difficulty = diff.toLowerCase();
           _battleQuestions = qList;
+          _userAnswers = List.filled(qList.length, null);
           _loadingQuestions = false;
+          _myAvatar = myAvatar;
+          _oppAvatar = oppAvatar;
+          _setupBotForQuestion();
         });
         _timerAnim.forward();
         _startTimer();
@@ -87,11 +157,37 @@ class _BattleScreenState extends State<BattleScreen>
         final s1 = sessionData['score_player1'] as int;
         final s2 = sessionData['score_player2'] as int;
 
+        final p1Finished = sessionData['player1_finished'] as bool? ?? false;
+        final p2Finished = sessionData['player2_finished'] as bool? ?? false;
+
         if (mounted) {
           setState(() {
+            _p1Finished = p1Finished;
+            _p2Finished = p2Finished;
             _oppScore = _isPlayer1 ? s2 : s1;
             _myScore = _isPlayer1 ? s1 : s2;
+
+            // Calculate opponent answered count
+            final oppPlayerKey = _isPlayer1 ? 'p2' : 'p1';
+            _oppAnsweredCount = 0;
+            if (sessionData['answers'] != null) {
+              final Map<String, dynamic> answers = sessionData['answers'] as Map<String, dynamic>;
+              for (int i = 0; i < _battleQuestions.length; i++) {
+                final qKey = 'q_$i';
+                if (answers.containsKey(qKey) && answers[qKey] is Map) {
+                  final qAns = answers[qKey] as Map<String, dynamic>;
+                  if (qAns.containsKey(oppPlayerKey)) {
+                    _oppAnsweredCount++;
+                  }
+                }
+              }
+            }
           });
+
+          // If both finished, navigate to results
+          if (_waitingForOpponent && p1Finished && p2Finished) {
+            _navigateToResults();
+          }
         }
       });
     } catch (e) {
@@ -112,12 +208,56 @@ class _BattleScreenState extends State<BattleScreen>
           setState(() => _timeLeft--);
         }
 
-        // If opponent is bot, simulate bot answering with a probability
-        if (_isBot && !_answered && _timeLeft == 22) {
-          final correct = Random().nextDouble() < 0.7;
-          if (correct) {
-            final newOppScore = _oppScore + 100;
-            await FirebaseService().updateScore(_sessionId, !_isPlayer1, newOppScore);
+        // Smarter Bot simulation (runs independently of player answering status)
+        if (_isBot && !_botAnsweredThisQuestion) {
+          final elapsed = 30 - _timeLeft;
+          if (elapsed >= _botResponseTime!) {
+            _botAnsweredThisQuestion = true;
+            final oppPlayerKey = _isPlayer1 ? 'p2' : 'p1';
+            
+            if (_botCorrect!) {
+              final List<int> questionWeights = [10, 10, 15, 15, 20, 20, 25, 25, 30, 30];
+              final basePoints = questionWeights[_qIndex.clamp(0, questionWeights.length - 1)];
+              final speedBonus = _timeLeft ~/ 2;
+              
+              // Check if player has answered correctly first
+              final myPlayerKey = _isPlayer1 ? 'p1' : 'p2';
+              final sessionDoc = await FirebaseFirestore.instance.collection('duel_sessions').doc(_sessionId).get();
+              final sessionData = sessionDoc.data() ?? {};
+              final answers = sessionData['answers'] as Map<String, dynamic>? ?? {};
+              final qKey = 'q_$_qIndex';
+              
+              bool playerCorrectFirst = false;
+              if (answers.containsKey(qKey)) {
+                final myAns = answers[qKey][myPlayerKey] as Map<String, dynamic>?;
+                if (myAns != null && myAns['correct'] == true) {
+                  playerCorrectFirst = true;
+                }
+              }
+              
+              int firstCorrectBonus = playerCorrectFirst ? 0 : 10;
+              final botEarnedPoints = basePoints + speedBonus + firstCorrectBonus;
+              
+              final currentBotScore = sessionData[_isPlayer1 ? 'score_player2' : 'score_player1'] as int? ?? 0;
+              final newBotScore = currentBotScore + botEarnedPoints;
+              
+              await FirebaseFirestore.instance.collection('duel_sessions').doc(_sessionId).update({
+                _isPlayer1 ? 'score_player2' : 'score_player1': newBotScore,
+                'answers.q_$_qIndex.$oppPlayerKey': {
+                  'correct': true,
+                  'time_left': _timeLeft,
+                  'timestamp': FieldValue.serverTimestamp(),
+                }
+              });
+            } else {
+              await FirebaseFirestore.instance.collection('duel_sessions').doc(_sessionId).update({
+                'answers.q_$_qIndex.$oppPlayerKey': {
+                  'correct': false,
+                  'time_left': _timeLeft,
+                  'timestamp': FieldValue.serverTimestamp(),
+                }
+              });
+            }
           }
         }
       }
@@ -128,23 +268,116 @@ class _BattleScreenState extends State<BattleScreen>
     if (_answered) return;
     
     final q = _battleQuestions[_qIndex];
-    final isCorrect = q['ans'] == idx || q['correct_answer'] == q['options'][idx];
+    final isCorrect = q['ans'] == idx || q['correct_answer'] == (q['options'] ?? q['opts'])[idx];
+
+    _userAnswers[_qIndex] = idx;
+    
+    int earnedPoints = 0;
+    int basePoints = 0;
+    int speedBonus = 0;
+    int firstCorrectBonus = 0;
+
+    if (isCorrect) {
+      final List<int> questionWeights = [10, 10, 15, 15, 20, 20, 25, 25, 30, 30];
+      basePoints = questionWeights[_qIndex.clamp(0, questionWeights.length - 1)];
+      speedBonus = _timeLeft ~/ 2;
+      
+      final oppPlayerKey = _isPlayer1 ? 'p2' : 'p1';
+      
+      final sessionDoc = await FirebaseFirestore.instance.collection('duel_sessions').doc(_sessionId).get();
+      final sessionData = sessionDoc.data() ?? {};
+      final answers = sessionData['answers'] as Map<String, dynamic>? ?? {};
+      final qKey = 'q_$_qIndex';
+      
+      bool oppCorrectFirst = false;
+      if (answers.containsKey(qKey)) {
+        final oppAns = answers[qKey][oppPlayerKey] as Map<String, dynamic>?;
+        if (oppAns != null && oppAns['correct'] == true) {
+          oppCorrectFirst = true;
+        }
+      }
+      
+      if (!oppCorrectFirst) {
+        firstCorrectBonus = 10;
+      }
+      
+      earnedPoints = basePoints + speedBonus + firstCorrectBonus;
+    }
 
     setState(() {
       _selected = idx;
       _answered = true;
       if (isCorrect) {
-        _myScore += 100;
+        _myScore += earnedPoints;
       }
     });
 
+    if (isCorrect && mounted) {
+      String message = '+$basePoints poin';
+      if (speedBonus > 0) message += ' \n+$speedBonus Poin Kecepatan';
+      if (firstCorrectBonus > 0) message += ' \n+$firstCorrectBonus Poin Tercepat';
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message, style: const TextStyle(fontWeight: FontWeight.bold)),
+          duration: const Duration(milliseconds: 1200),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.only(bottom: 200, left: 50, right: 50),
+        ),
+      );
+    }
+
     try {
-      await FirebaseService().updateScore(_sessionId, _isPlayer1, _myScore);
+      final myPlayerKey = _isPlayer1 ? 'p1' : 'p2';
+      await FirebaseFirestore.instance.collection('duel_sessions').doc(_sessionId).update({
+        _isPlayer1 ? 'score_player1' : 'score_player2': _myScore,
+        'answers.q_$_qIndex.$myPlayerKey': {
+          'correct': isCorrect,
+          'time_left': _timeLeft,
+          'timestamp': FieldValue.serverTimestamp(),
+        }
+      });
     } catch (e) {
       debugPrint("Failed to update score: $e");
     }
 
-    Future.delayed(const Duration(milliseconds: 1200), _nextQuestion);
+    Future.delayed(const Duration(milliseconds: 1500), _nextQuestion);
+  }
+
+  void _navigateToResults() {
+    _timer?.cancel();
+    _waitingTimer?.cancel();
+    _duelSub?.cancel();
+    Navigator.pushReplacementNamed(
+      context,
+      AppRoutes.result,
+      arguments: {
+        'sessionId': _sessionId,
+        'myScore': _myScore,
+        'oppScore': _oppScore,
+        'myAvatar': _myAvatar,
+        'oppAvatar': _oppAvatar,
+        'questions': _battleQuestions,
+        'userAnswers': _userAnswers,
+      },
+    );
+  }
+
+  void _startWaitingTimeout() {
+    _waitingTimer?.cancel();
+    _waitingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_waitingTimeLeft <= 1) {
+        timer.cancel();
+        _navigateToResults();
+      } else {
+        if (mounted) {
+          setState(() {
+            _waitingTimeLeft--;
+          });
+        }
+      }
+    });
   }
 
   void _nextQuestion() {
@@ -156,26 +389,51 @@ class _BattleScreenState extends State<BattleScreen>
           _timeLeft = 30;
           _selected = null;
           _answered = false;
+          _setupBotForQuestion();
         });
         _startTimer();
       }
     } else {
-      _duelSub?.cancel();
-      Navigator.pushReplacementNamed(
-        context,
-        AppRoutes.result,
-        arguments: {
-          'sessionId': _sessionId,
-          'myScore': _myScore,
-          'oppScore': _oppScore,
-        },
-      );
+      // Mark myself as finished in Firestore
+      final myFinishKey = _isPlayer1 ? 'player1_finished' : 'player2_finished';
+      final updates = <String, dynamic>{
+        myFinishKey: true,
+      };
+      if (_isBot) {
+        final oppFinishKey = _isPlayer1 ? 'player2_finished' : 'player1_finished';
+        updates[oppFinishKey] = true;
+      }
+      FirebaseFirestore.instance.collection('duel_sessions').doc(_sessionId).update(updates);
+
+      if (mounted) {
+        setState(() {
+          _waitingForOpponent = true;
+          if (_isPlayer1) {
+            _p1Finished = true;
+          } else {
+            _p2Finished = true;
+          }
+          if (_isBot) {
+            _p1Finished = true;
+            _p2Finished = true;
+          }
+        });
+        
+        // Immediately navigate if both finished (avoiding stream event lag)
+        if (_p1Finished && _p2Finished) {
+          _navigateToResults();
+          return;
+        }
+        
+        _startWaitingTimeout();
+      }
     }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _waitingTimer?.cancel();
     _timerAnim.dispose();
     _duelSub?.cancel();
     super.dispose();
@@ -184,7 +442,7 @@ class _BattleScreenState extends State<BattleScreen>
   Color _optionColor(int i) {
     if (!_answered) return AppColors.surface;
     final q = _battleQuestions[_qIndex];
-    final correct = q['ans'] == i || q['correct_answer'] == q['options'][i];
+    final correct = q['ans'] == i || q['correct_answer'] == (q['options'] ?? q['opts'])[i];
     if (_selected == i) return correct ? AppColors.successSurface : AppColors.errorSurface;
     if (correct) return AppColors.successSurface;
     return AppColors.surface;
@@ -193,7 +451,7 @@ class _BattleScreenState extends State<BattleScreen>
   Color _optionBorder(int i) {
     if (!_answered) return AppColors.border;
     final q = _battleQuestions[_qIndex];
-    final correct = q['ans'] == i || q['correct_answer'] == q['options'][i];
+    final correct = q['ans'] == i || q['correct_answer'] == (q['options'] ?? q['opts'])[i];
     if (_selected == i) return correct ? AppColors.success : AppColors.error;
     if (correct) return AppColors.success;
     return AppColors.border;
@@ -216,6 +474,76 @@ class _BattleScreenState extends State<BattleScreen>
       );
     }
 
+    if (_waitingForOpponent) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF1F1F2E),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 6,
+                          backgroundColor: Colors.white10,
+                          valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                        ),
+                      ).animate(onPlay: (c) => c.repeat()).rotate(duration: 2000.ms),
+                      const Icon(Icons.hourglass_empty_rounded, color: Colors.white, size: 36)
+                          .animate(onPlay: (c) => c.repeat(reverse: true))
+                          .scale(duration: 1000.ms, begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1)),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  Text(
+                    'Menunggu Lawan Selesai...',
+                    style: AppTextStyles.h2.copyWith(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Lawan sedang menjawab: $_oppAnsweredCount / ${_battleQuestions.length} soal',
+                    style: AppTextStyles.bodyMedium.copyWith(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 48),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Text(
+                      'Otomatis lanjut dalam $_waitingTimeLeft detik...',
+                      style: AppTextStyles.caption.copyWith(color: Colors.white60, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  TextButton(
+                    onPressed: _navigateToResults,
+                    child: Text(
+                      'Lewati & Lihat Hasil',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.primary,
+                        decoration: TextDecoration.underline,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final q = _battleQuestions[_qIndex];
     final opts = List<String>.from(q['options'] ?? q['opts']);
 
@@ -231,7 +559,7 @@ class _BattleScreenState extends State<BattleScreen>
                 children: [
                   _PlayerCard(
                     name: 'Kamu',
-                    emoji: '🧑',
+                    emoji: _myAvatar,
                     score: _myScore,
                     color: AppColors.primary,
                     isMe: true,
@@ -277,7 +605,7 @@ class _BattleScreenState extends State<BattleScreen>
                   ),
                   _PlayerCard(
                     name: _oppName,
-                    emoji: _isBot ? '🤖' : '🧑',
+                    emoji: _oppAvatar,
                     score: _oppScore,
                     color: AppColors.secondary,
                     isMe: false,
@@ -450,7 +778,7 @@ class _PlayerCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 28)),
+          IconHandler.buildItemIcon(emoji, size: 28, color: color),
           const SizedBox(height: 2),
           Text(name, style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700)),
           Text(

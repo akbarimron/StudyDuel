@@ -120,7 +120,7 @@ class BadgesListScreen extends StatelessWidget {
                         const SizedBox(width: 12),
                         // Character Mascot
                         Image.asset(
-                          'assets/images/mascot.png',
+                          'assets/images/char/kinz.png',
                           width: 100,
                           height: 100,
                           fit: BoxFit.contain,
@@ -143,68 +143,100 @@ class BadgesListScreen extends StatelessWidget {
                       final softColor = _getBadgeColor(bId);
                       final borderColor = _getBadgeBorderColor(bId);
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: earned ? softColor : AppColors.surface,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: earned ? borderColor.withValues(alpha: 0.3) : AppColors.border,
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.02),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                      final docIndex = badgeDocs.indexWhere((doc) => doc.data()['badge_id'] == bId);
+                      final bool isPinned = docIndex != -1 ? (badgeDocs[docIndex].data()['is_pinned'] == true) : false;
+                      final isOwnProfile = uid == myUid;
+
+                      Widget card = Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: earned ? softColor : AppColors.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: earned ? borderColor.withValues(alpha: 0.3) : AppColors.border,
+                            width: 1.5,
                           ),
-                          child: Row(
-                            children: [
-                              // Badge icon
-                              RibbonBadge(
-                                type: bId,
-                                earned: earned,
-                                size: 64,
-                              ),
-                              const SizedBox(width: 16),
-                              // Badge details
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            badge['badge_name'] as String,
-                                            style: AppTextStyles.h3.copyWith(
-                                              fontSize: 16,
-                                              color: earned ? AppColors.textPrimary : AppColors.textSecondary,
-                                            ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.02),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            // Badge icon
+                            RibbonBadge(
+                              type: bId,
+                              earned: earned,
+                              size: 64,
+                            ),
+                            const SizedBox(width: 16),
+                            // Badge details
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          badge['badge_name'] as String,
+                                          style: AppTextStyles.h3.copyWith(
+                                            fontSize: 16,
+                                            color: earned ? AppColors.textPrimary : AppColors.textSecondary,
                                           ),
                                         ),
-                                        if (!earned)
-                                          const Icon(Icons.lock_rounded, color: AppColors.textHint, size: 16),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      badge['description'] as String,
-                                      style: AppTextStyles.bodySmall.copyWith(
-                                        color: earned ? AppColors.textSecondary : AppColors.textHint,
-                                        height: 1.4,
                                       ),
+                                      if (!earned)
+                                        const Icon(Icons.lock_rounded, color: AppColors.textHint, size: 16)
+                                      else if (isOwnProfile)
+                                        Icon(
+                                          isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                                          color: isPinned ? AppColors.primary : AppColors.textHint,
+                                          size: 18,
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    badge['description'] as String,
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: earned ? AppColors.textSecondary : AppColors.textHint,
+                                      height: 1.4,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
+                      );
+
+                      if (earned && isOwnProfile) {
+                        card = GestureDetector(
+                          onTap: () async {
+                            try {
+                              await FirebaseService().toggleBadgePin(uid, bId, !isPinned);
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(e.toString().replaceAll('Exception: ', '')),
+                                    backgroundColor: const Color(0xFFFF4757),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          child: card,
+                        );
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: card,
                       ).animate().fadeIn(delay: Duration(milliseconds: 50 * index)).slideY(begin: 0.1, delay: Duration(milliseconds: 50 * index));
                     },
                     childCount: allDefinitions.length,

@@ -1,0 +1,7 @@
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/studyDuel_logo.png"
+  background_color: "#1565C0"
+  adaptive_icon_background: "#1565C0"
+  adaptive_icon_foreground: "assets/images/studyDuel_logo.png"

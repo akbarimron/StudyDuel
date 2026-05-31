@@ -23,14 +23,41 @@ class _LoginScreenState extends State<LoginScreen> {
   void _login() async {
     if (_usernameCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Username dan password wajib diisi!')),
+        const SnackBar(content: Text('Username atau email dan password wajib diisi!')),
       );
       return;
     }
     setState(() => _loading = true);
     try {
-      final email = "${_usernameCtrl.text.trim().toLowerCase()}@studyduel.com";
-      await FirebaseService().signIn(email, _passCtrl.text);
+      String emailInput = _usernameCtrl.text.trim();
+      String resolvedEmail = emailInput;
+
+      if (!emailInput.contains('@')) {
+        // Query user collection for username
+        var querySnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .where('username', isEqualTo: emailInput)
+            .limit(1)
+            .get();
+
+        if (querySnapshot.docs.isEmpty) {
+          // Try lowercase query
+          querySnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .where('username', isEqualTo: emailInput.toLowerCase())
+              .limit(1)
+              .get();
+        }
+
+        if (querySnapshot.docs.isNotEmpty) {
+          resolvedEmail = querySnapshot.docs.first.data()['email'] ?? emailInput;
+        } else {
+          // Fallback to legacy format
+          resolvedEmail = "${emailInput.toLowerCase()}@studyduel.com";
+        }
+      }
+
+      await FirebaseService().signIn(resolvedEmail, _passCtrl.text);
       if (mounted) {
         setState(() => _loading = false);
         Navigator.pushReplacementNamed(context, AppRoutes.home);
@@ -41,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Gagal masuk: Username atau Password salah!',
+              'Gagal masuk: Username/Email atau Password salah!',
               style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
             ),
             backgroundColor: AppColors.error,
@@ -86,59 +113,48 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color.fromARGB(255, 87, 121, 233),
       body: Stack(
         children: [
-          // Header banner biru
-          Positioned(
-            top: 0, left: 0, right: 0,
-            child: Container(
-              height: 220,
-              decoration: const BoxDecoration(
-                color: AppColors.secondary,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(0),
-                  bottomRight: Radius.circular(0),
-                ),
-              ),
-              child: SafeArea(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Logo
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          // Header banner dengan background image
+          Positioned( 
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SizedBox(
+              height: 370,
+              child: Stack(
+                children: [
+                  // Background Image
+                  Positioned.fill(
+                    child: Image.asset(
+                      'assets/images/bg_Login_screen.png',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  // Overlay gradien untuk memastikan teks terbaca namun gambar tetap tajam
+                  Positioned.fill(
+                    child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'STUDY DUEL',
-                        style: AppTextStyles.h2.copyWith(
-                          color: Colors.white,
-                          letterSpacing: 2,
-                          fontWeight: FontWeight.w900,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.1),
+                            Colors.black.withValues(alpha: 0.4),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('🧒', style: TextStyle(fontSize: 50)),
-                        SizedBox(width: 8),
-                        Text('👧', style: TextStyle(fontSize: 50)),
-                      ],
-                    ),
-                  ],
-                ),
+                  )
+                ],
               ),
             ),
           ),
 
           // Form card
           Positioned.fill(
-            top: 190,
+            top: 300,
             child: Container(
               decoration: const BoxDecoration(
                 color: AppColors.surface,
@@ -163,12 +179,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         .animate().fadeIn(delay: 100.ms),
                     const SizedBox(height: 28),
 
-                    // Username
+                    // Username atau Email
                     TextField(
                       controller: _usernameCtrl,
                       style: AppTextStyles.bodyLarge,
                       decoration: const InputDecoration(
-                        labelText: 'Username',
+                        labelText: 'Username atau Email',
                         labelStyle: TextStyle(color: AppColors.textHint, fontSize: 14),
                       ),
                     ).animate().fadeIn(delay: 200.ms),
@@ -236,17 +252,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       prefixIcon: Container(
                         width: 22,
                         height: 22,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: const Center(
-                          child: Text('G',
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.red)),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: Image.asset(
+                            'assets/images/logo_google.png',
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                       onPressed: _loginWithGoogle,
@@ -265,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               TextSpan(
                                 text: 'Buat!',
                                 style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.primary,
+                                  color: const Color.fromARGB(255, 31, 117, 216),
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),

@@ -4,7 +4,7 @@ import '../theme/app_colors.dart';
 class SubjectModel {
   final String id;
   final String name;
-  final String emoji;
+  final IconData icon;
   final Color color;
   final Color lightColor;
   final int totalTopics;
@@ -14,7 +14,7 @@ class SubjectModel {
   const SubjectModel({
     required this.id,
     required this.name,
-    required this.emoji,
+    required this.icon,
     required this.color,
     required this.lightColor,
     required this.totalTopics,
@@ -30,7 +30,7 @@ final List<SubjectModel> smpSubjects = [
   SubjectModel(
     id: 'math',
     name: 'Matematika',
-    emoji: '📐',
+    icon: Icons.calculate_rounded,
     color: AppColors.math,
     lightColor: AppColors.primarySurface,
     totalTopics: 24,
@@ -40,7 +40,7 @@ final List<SubjectModel> smpSubjects = [
   SubjectModel(
     id: 'science',
     name: 'IPA',
-    emoji: '🔬',
+    icon: Icons.science_rounded,
     color: AppColors.science,
     lightColor: AppColors.successSurface,
     totalTopics: 20,
@@ -50,7 +50,7 @@ final List<SubjectModel> smpSubjects = [
   SubjectModel(
     id: 'social',
     name: 'IPS',
-    emoji: '🌍',
+    icon: Icons.public_rounded,
     color: AppColors.social,
     lightColor: AppColors.accentSurface,
     totalTopics: 18,
@@ -60,7 +60,7 @@ final List<SubjectModel> smpSubjects = [
   SubjectModel(
     id: 'indonesian',
     name: 'B. Indonesia',
-    emoji: '📚',
+    icon: Icons.menu_book_rounded,
     color: AppColors.indonesian,
     lightColor: AppColors.errorSurface,
     totalTopics: 22,
@@ -70,7 +70,7 @@ final List<SubjectModel> smpSubjects = [
   SubjectModel(
     id: 'english',
     name: 'B. Inggris',
-    emoji: '🇬🇧',
+    icon: Icons.language_rounded,
     color: AppColors.english,
     lightColor: Color(0xFFEFF6FF),
     totalTopics: 20,
@@ -80,7 +80,7 @@ final List<SubjectModel> smpSubjects = [
   SubjectModel(
     id: 'civics',
     name: 'PKN',
-    emoji: '🏛️',
+    icon: Icons.account_balance_rounded,
     color: AppColors.civics,
     lightColor: Color(0xFFF5F3FF),
     totalTopics: 15,
@@ -90,7 +90,7 @@ final List<SubjectModel> smpSubjects = [
   SubjectModel(
     id: 'religion',
     name: 'Ag. Islam',
-    emoji: '✨',
+    icon: Icons.auto_awesome_rounded,
     color: AppColors.religion,
     lightColor: Color(0xFFFDF2F8),
     totalTopics: 16,
@@ -100,7 +100,7 @@ final List<SubjectModel> smpSubjects = [
   SubjectModel(
     id: 'arts',
     name: 'Seni Budaya',
-    emoji: '🎨',
+    icon: Icons.palette_rounded,
     color: AppColors.arts,
     lightColor: Color(0xFFFFF7ED),
     totalTopics: 12,

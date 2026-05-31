@@ -33,7 +33,7 @@ class SubjectCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Emoji icon
+              // Icon
               Container(
                 width: 44,
                 height: 44,
@@ -42,9 +42,10 @@ class SubjectCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
-                  child: Text(
-                    subject.emoji,
-                    style: const TextStyle(fontSize: 22),
+                  child: Icon(
+                    subject.icon,
+                    color: subject.color,
+                    size: 24,
                   ),
                 ),
               ),

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/utils/icon_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
@@ -9,6 +11,7 @@ import '../profile/profile_screen.dart';
 import '../duel/duel_lobby_screen.dart';
 import '../gacha/gacha_screen.dart';
 import '../friends/friends_screen.dart';
+import '../friends/chat_screen.dart';
 import '../../core/services/firebase_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,6 +23,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _navIndex = 0;
+  StreamSubscription? _notificationsSubscription;
 
   final _pages = const [
     _HomeTab(),
@@ -28,6 +32,293 @@ class _HomeScreenState extends State<HomeScreen> {
     FriendsScreen(),
     ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToNotifications();
+  }
+
+  OverlayEntry? _notificationOverlayEntry;
+  Timer? _notificationOverlayTimer;
+
+  @override
+  void dispose() {
+    _notificationsSubscription?.cancel();
+    _notificationOverlayTimer?.cancel();
+    _notificationOverlayEntry?.remove();
+    super.dispose();
+  }
+
+  void _showTopNotification(String notificationId, String fromUid, String fromName, String message) {
+    // Mark notification as read in Firestore
+    FirebaseFirestore.instance
+        .collection('users')
+        .doc(FirebaseService().currentUser?.uid)
+        .collection('notifications')
+        .doc(notificationId)
+        .update({'status': 'read'});
+
+    _notificationOverlayTimer?.cancel();
+    _notificationOverlayEntry?.remove();
+    _notificationOverlayEntry = null;
+
+    _notificationOverlayEntry = OverlayEntry(
+      builder: (context) {
+        return Positioned(
+          top: MediaQuery.of(context).padding.top + 10,
+          left: 16,
+          right: 16,
+          child: Material(
+            color: Colors.transparent,
+            child: GestureDetector(
+              onTap: () {
+                _notificationOverlayEntry?.remove();
+                _notificationOverlayEntry = null;
+                _notificationOverlayTimer?.cancel();
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.chat,
+                  arguments: {
+                    'friendUid': fromUid,
+                    'friendName': fromName,
+                    'friendAvatar': 'kinz.png',
+                    'isOnline': true,
+                  },
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.darkNavyLight,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            fromName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            message,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'BALAS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ).animate().slideY(begin: -0.2, end: 0, duration: 300.ms, curve: Curves.easeOutBack).fadeIn(duration: 200.ms),
+          ),
+        );
+      },
+    );
+
+    Overlay.of(context).insert(_notificationOverlayEntry!);
+
+    _notificationOverlayTimer = Timer(const Duration(seconds: 4), () {
+      _notificationOverlayEntry?.remove();
+      _notificationOverlayEntry = null;
+    });
+  }
+
+  void _listenToNotifications() {
+    final uid = FirebaseService().currentUser?.uid;
+    if (uid == null) return;
+
+    _notificationsSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .snapshots()
+        .listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final data = change.doc.data();
+          if (data != null) {
+            final type = data['type'] as String? ?? '';
+            final status = data['status'] as String? ?? '';
+            final notificationId = change.doc.id;
+
+            if (type == 'friend_challenge' && status == 'pending') {
+              final fromUid = data['from_uid'] as String? ?? '';
+              final fromName = data['from_name'] as String? ?? 'Teman';
+              final sessionId = data['session_id'] as String? ?? '';
+
+              if (mounted) {
+                _showChallengeDialog(notificationId, fromUid, fromName, sessionId);
+              }
+            } else if (type == 'chat_message' && status == 'unread') {
+              final fromUid = data['from_uid'] as String? ?? '';
+              final fromName = data['from_name'] as String? ?? 'Teman';
+              final message = data['message'] as String? ?? '';
+
+              if (mounted) {
+                if (!ChatScreen.isActive) {
+                  _showTopNotification(notificationId, fromUid, fromName, message);
+                } else {
+                  // Mark as read immediately if user is already in ChatScreen
+                  FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(uid)
+                      .collection('notifications')
+                      .doc(notificationId)
+                      .update({'status': 'read'});
+                }
+              }
+            } else if ((type == 'friend_accepted' || type == 'friend_request') && status == 'unread') {
+              // Automatically mark as read but DO NOT show snackbars/popups (as requested)
+              FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(uid)
+                  .collection('notifications')
+                  .doc(notificationId)
+                  .update({'status': 'read'});
+            }
+          }
+        }
+      }
+    });
+  }
+
+  void _showChallengeDialog(String notificationId, String fromUid, String fromName, String sessionId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: const Color(0xFF1F1F2E),
+          title: Row(
+            children: [
+              const Icon(Icons.psychology_rounded, color: AppColors.primary, size: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Tantangan Duel!',
+                  style: AppTextStyles.h2.copyWith(color: Colors.white, fontSize: 20),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            '$fromName menantangmu untuk duel!',
+            style: AppTextStyles.bodyMedium.copyWith(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(FirebaseService().currentUser?.uid)
+                    .collection('notifications')
+                    .doc(notificationId)
+                    .update({'status': 'declined'});
+                
+                await FirebaseFirestore.instance
+                    .collection('duel_sessions')
+                    .doc(sessionId)
+                    .update({'status': 'declined'});
+              },
+              child: Text(
+                'Tolak',
+                style: AppTextStyles.label.copyWith(color: AppColors.primary),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.success,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                
+                final myUid = FirebaseService().currentUser?.uid;
+                final myProfileDoc = await FirebaseFirestore.instance.collection('users').doc(myUid).get();
+                final myMmr = myProfileDoc.data()?['mmr'] ?? 80;
+
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(myUid)
+                    .collection('notifications')
+                    .doc(notificationId)
+                    .update({'status': 'accepted'});
+
+                await FirebaseFirestore.instance
+                    .collection('duel_sessions')
+                    .doc(sessionId)
+                    .update({
+                  'player2_id': myUid,
+                  'player2_name': myProfileDoc.data()?['name'] ?? 'Pelajar',
+                  'player2_mmr': myMmr,
+                  'status': 'ongoing',
+                  'started_at': FieldValue.serverTimestamp(),
+                });
+
+                if (mounted) {
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.battle,
+                    arguments: {
+                      'sessionId': sessionId,
+                      'isPlayer1': false,
+                    },
+                  );
+                }
+              },
+              child: Text(
+                'Terima',
+                style: AppTextStyles.label.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,22 +349,31 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 _NavItem(
                   icon: Icons.leaderboard_rounded,
-                  label: 'Ranking',
+                  label: 'Peringkat',
                   active: _navIndex == 1,
                   onTap: () => setState(() => _navIndex = 1),
                 ),
                 _NavItem(
-                  icon: Icons.sports_kabaddi_rounded,
+                  icon: Icons.sports_martial_arts_rounded,
                   label: 'Duel',
                   active: _navIndex == 2,
                   onTap: () => setState(() => _navIndex = 2),
                   highlight: true,
                 ),
-                _NavItem(
-                  icon: Icons.people_rounded,
-                  label: 'Friend',
-                  active: _navIndex == 3,
-                  onTap: () => setState(() => _navIndex = 3),
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseService().currentUser != null
+                      ? FirebaseService().getFriendRequestsStream()
+                      : const Stream.empty(),
+                  builder: (context, snapshot) {
+                    final badgeCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                    return _NavItem(
+                      icon: Icons.people_rounded,
+                      label: 'Teman',
+                      active: _navIndex == 3,
+                      badgeCount: badgeCount,
+                      onTap: () => setState(() => _navIndex = 3),
+                    );
+                  },
                 ),
                 _NavItem(
                   icon: Icons.person_rounded,
@@ -95,6 +395,7 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool active;
   final bool highlight;
+  final int badgeCount;
   final VoidCallback onTap;
 
   const _NavItem({
@@ -103,6 +404,7 @@ class _NavItem extends StatelessWidget {
     required this.active,
     required this.onTap,
     this.highlight = false,
+    this.badgeCount = 0,
   });
 
   @override
@@ -113,43 +415,77 @@ class _NavItem extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppColors.secondary, Color(0xFFFF4757)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: const Color(0xFFE63946),
             borderRadius: BorderRadius.circular(100),
             boxShadow: [
               BoxShadow(
-                color: AppColors.secondary.withValues(alpha: 0.4),
+                color: const Color(0xFFE63946).withValues(alpha: 0.4),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               )
             ],
           ),
-          child: Row(
+        child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: Colors.white, size: 20),
-              const SizedBox(width: 6),
               Text(
                 label,
-                style: AppTextStyles.label.copyWith(color: Colors.white),
+                style: AppTextStyles.label.copyWith(color: Colors.white, fontWeight: FontWeight.w900),
               ),
             ],
           ),
         ),
       );
     }
+
+    Widget iconWidget = Icon(
+      icon,
+      color: active ? AppColors.primary : AppColors.textHint,
+      size: 24,
+    );
+
+    if (badgeCount > 0) {
+      iconWidget = Stack(
+        clipBehavior: Clip.none,
+        children: [
+          iconWidget,
+          Positioned(
+            right: -6,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF4757),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 16,
+                minHeight: 16,
+              ),
+              child: Center(
+                child: Text(
+                  '$badgeCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: active ? AppColors.primary : AppColors.textHint,
-            size: 24,
-          ),
+          iconWidget,
           const SizedBox(height: 2),
           Text(
             label,
@@ -208,7 +544,7 @@ class _HomeTabState extends State<_HomeTab> {
         final int gems = userData['gems'] ?? 0;
         final int xp = userData['xp'] ?? 0;
         final int level = userData['level'] ?? 1;
-        final String avatar = userData['avatar_url'] ?? '🧑';
+        final String avatar = userData['avatar_url'] ?? 'kinz.png';
         final int winRate = (((userData['win_rate'] ?? 0.0) as num) * 100).toInt();
         final int totalDuels = userData['total_duels'] ?? 0;
         final int mmr = userData['mmr'] ?? 80;
@@ -230,7 +566,7 @@ class _HomeTabState extends State<_HomeTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 1. Header Section
-                  _buildHeader(name, streak, avatar),
+                  _buildHeader(uid, name, streak, avatar),
                   const SizedBox(height: 20),
 
                   // 2. Stats & Level Progress Card
@@ -239,15 +575,11 @@ class _HomeTabState extends State<_HomeTab> {
 
                   // 3. Tantangan Harian
                   _buildDailyChallenges(context, uid, userData['daily_challenges'] as List<dynamic>? ?? []),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
                   // Friend Requests
                   _HomeFriendRequests(uid: uid),
-                  const SizedBox(height: 20),
-
-                  // 4. Action Buttons (DUEL & GACHA)
-                  _buildActionButtons(context),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
 
                   // 5. Kalender (Streak Calendar)
                   _buildStreakCalendar(streak, userData['streak_last_date'] as Timestamp?),
@@ -265,7 +597,7 @@ class _HomeTabState extends State<_HomeTab> {
     );
   }
 
-  Widget _buildHeader(String name, int streak, String avatar) {
+  Widget _buildHeader(String uid, String name, int streak, String avatar) {
     return Row(
       children: [
         Expanded(
@@ -319,60 +651,53 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
               ),
               const SizedBox(width: 4),
-              const Text('🔥', style: TextStyle(fontSize: 16)),
+              const Icon(Icons.whatshot_rounded, color: Colors.orange, size: 16),
             ],
           ),
         ),
-        const SizedBox(width: 10),
-        // Bell Icon
-        Stack(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFC107),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.notifications_rounded, color: Colors.white, size: 20),
-            ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
+        const SizedBox(width: 8),
+        // Gacha/Shop Icon
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const GachaScreen()),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
                 ),
-                child: const Text(
-                  '2',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              ],
             ),
-          ],
+            child: const Icon(Icons.shopping_bag_rounded, color: Color(0xFF4EA8DE), size: 18),
+          ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         // Circular Avatar
         Container(
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: const Color(0xFFFFECEF),
+            color: AppColors.primary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFFFFC107), width: 2),
           ),
           child: Center(
-            child: Text(avatar, style: const TextStyle(fontSize: 24)),
+            child: IconHandler.buildItemIcon(avatar, size: 32, color: AppColors.primary),
           ),
         ),
       ],
     ).animate().fadeIn(duration: 400.ms);
   }
+
+
 
   Widget _buildStatsCard(int xp, int gems, int winRate, int totalDuels, int level, int relativeXp, int xpRemaining, int mmr) {
     return Container(
@@ -413,7 +738,7 @@ class _HomeTabState extends State<_HomeTab> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  Text(_getRankEmoji(mmr), style: const TextStyle(fontSize: 12)),
+                  Icon(_getRankIcon(mmr), size: 14, color: _getRankColor(mmr)),
                   const SizedBox(width: 4),
                   Icon(Icons.info_outline_rounded, size: 10, color: _getRankColor(mmr)),
                 ],
@@ -440,7 +765,13 @@ class _HomeTabState extends State<_HomeTab> {
               ),
               _buildStatsMiniCol('$winRate%', 'Win rate'),
               _buildStatsMiniCol('$totalDuels', 'Total Duel'),
-              _buildStatsMiniCol('$gems', 'Poin', labelColor: const Color(0xFFFFC107)),
+              FutureBuilder<int>(
+                future: FirebaseService().getUserLeaderboardRank(FirebaseService().currentUser?.uid ?? ''),
+                builder: (context, snapshot) {
+                  final rank = snapshot.data ?? 1;
+                  return _buildStatsMiniCol('#$rank', 'Rank', labelColor: const Color(0xFFFFC107));
+                },
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -469,6 +800,62 @@ class _HomeTabState extends State<_HomeTab> {
               valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF52B788)),
             ),
           ),
+          const SizedBox(height: 16),
+          // MMR Rank Progress Bar
+          (() {
+            double value = 0.0;
+            String text = '';
+            Color color = Colors.grey;
+            if (mmr < 100) {
+              value = mmr / 100.0;
+              text = '${100 - mmr} MMR lagi ke Perak';
+              color = const Color(0xFFCD7F32); // Bronze
+            } else if (mmr < 200) {
+              value = (mmr - 100) / 100.0;
+              text = '${200 - mmr} MMR lagi ke Emas';
+              color = const Color(0xFFC0C0C0); // Silver
+            } else if (mmr < 400) {
+              value = (mmr - 200) / 200.0;
+              text = '${400 - mmr} MMR lagi ke Platinum';
+              color = const Color(0xFFFFD700); // Gold
+            } else if (mmr < 800) {
+              value = (mmr - 400) / 400.0;
+              text = '${800 - mmr} MMR lagi ke Berlian';
+              color = const Color(0xFF4EA8DE); // Platinum
+            } else {
+              value = 1.0;
+              text = 'Berlian (Max Tier)';
+              color = const Color(0xFF906CD4); // Diamond
+            }
+
+            return Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Tingkat MMR',
+                      style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      text,
+                      style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.bold, color: color),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: value,
+                    minHeight: 10,
+                    backgroundColor: const Color.fromARGB(255, 234, 234, 234),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                ),
+              ],
+            );
+          })(),
         ],
       ),
     ).animate().fadeIn(duration: 400.ms, delay: 100.ms);
@@ -482,12 +869,12 @@ class _HomeTabState extends State<_HomeTab> {
     return 'Berlian';
   }
 
-  String _getRankEmoji(int mmr) {
-    if (mmr < 100) return '🥉';
-    if (mmr < 200) return '🥈';
-    if (mmr < 400) return '🥇';
-    if (mmr < 800) return '💎';
-    return '🏆';
+  IconData _getRankIcon(int mmr) {
+    if (mmr < 100) return Icons.shield_rounded; // Perunggu
+    if (mmr < 200) return Icons.shield_rounded; // Perak
+    if (mmr < 400) return Icons.shield_rounded; // Emas
+    if (mmr < 800) return Icons.workspace_premium_rounded; // Platinum
+    return Icons.diamond_rounded; // Berlian
   }
 
   Color _getRankColor(int mmr) {
@@ -504,25 +891,23 @@ class _HomeTabState extends State<_HomeTab> {
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            const Text('🏆', style: TextStyle(fontSize: 28)),
-            const SizedBox(width: 12),
-            Text('Tingkatan Rank MMR', style: AppTextStyles.h3),
-          ],
+        title: Text(
+          'Tingkatan Rank MMR',
+          style: AppTextStyles.h3,
+          textAlign: TextAlign.center,
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildRankTierRow('🥉 Perunggu', '0 - 99 MMR', const Color(0xFFCD7F32)),
+            _buildRankTierRow(Icons.shield_rounded, 'Perunggu', '0 - 99 MMR', const Color(0xFFCD7F32)),
             const Divider(),
-            _buildRankTierRow('🥈 Perak', '100 - 199 MMR', const Color(0xFFC0C0C0)),
+            _buildRankTierRow(Icons.shield_rounded, 'Perak', '100 - 199 MMR', const Color(0xFFC0C0C0)),
             const Divider(),
-            _buildRankTierRow('🥇 Emas', '200 - 399 MMR', const Color(0xFFFFD700)),
+            _buildRankTierRow(Icons.shield_rounded, 'Emas', '200 - 399 MMR', const Color(0xFFFFD700)),
             const Divider(),
-            _buildRankTierRow('💎 Platinum', '400 - 799 MMR', const Color(0xFF4EA8DE)),
+            _buildRankTierRow(Icons.workspace_premium_rounded, 'Platinum', '400 - 799 MMR', const Color(0xFF4EA8DE)),
             const Divider(),
-            _buildRankTierRow('🏆 Berlian', '>= 800 MMR', const Color(0xFF906CD4)),
+            _buildRankTierRow(Icons.diamond_rounded, 'Berlian', '>= 800 MMR', const Color(0xFF906CD4)),
           ],
         ),
         actions: [
@@ -535,13 +920,19 @@ class _HomeTabState extends State<_HomeTab> {
     );
   }
 
-  Widget _buildRankTierRow(String title, String range, Color color) {
+  Widget _buildRankTierRow(IconData icon, String title, String range, Color color) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: AppTextStyles.bodyLarge.copyWith(color: color, fontWeight: FontWeight.bold)),
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(title, style: AppTextStyles.bodyLarge.copyWith(color: color, fontWeight: FontWeight.bold)),
+            ],
+          ),
           Text(range, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary)),
         ],
       ),
@@ -703,7 +1094,7 @@ class _HomeTabState extends State<_HomeTab> {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Klaim reward sukses! $rewardText 🎉'),
+                              content: Text('Klaim reward sukses! $rewardText'),
                               backgroundColor: AppColors.success,
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -893,7 +1284,7 @@ class _HomeTabState extends State<_HomeTab> {
                                                 if (context.mounted) {
                                                   ScaffoldMessenger.of(context).showSnackBar(
                                                     const SnackBar(
-                                                      content: Text('Klaim reward sukses! 🎉'),
+                                                      content: Text('Klaim reward sukses!'),
                                                       backgroundColor: AppColors.success,
                                                       behavior: SnackBarBehavior.floating,
                                                     ),
@@ -1073,7 +1464,7 @@ class _HomeTabState extends State<_HomeTab> {
                       day.substring(0, 3),
                       style: AppTextStyles.caption.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 10,
+                        fontSize: 17,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -1097,7 +1488,18 @@ class _HomeTabState extends State<_HomeTab> {
                   }
                   
                   final dayNum = index - startOffset + 1;
-                  final bool isStreakActive = dayNum <= today && dayNum >= (today - streak + 1);
+                  
+                  // Perbaikan logika streak: gunakan streakLastDate sebagai referensi akhir streak
+                  bool isStreakActive = false;
+                  if (streakLastDate != null && streak > 0) {
+                    final lastDate = streakLastDate.toDate();
+                    final lastDateOnly = DateTime(lastDate.year, lastDate.month, lastDate.day);
+                    final currentDate = DateTime(year, month, dayNum);
+                    final streakStartDate = lastDateOnly.subtract(Duration(days: streak - 1));
+                    
+                    isStreakActive = !currentDate.isBefore(streakStartDate) && !currentDate.isAfter(lastDateOnly);
+                  }
+                  
                   final bool isToday = dayNum == today;
                   final bool isFuture = dayNum > today;
 
@@ -1105,38 +1507,39 @@ class _HomeTabState extends State<_HomeTab> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (isStreakActive)
-                        Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            const Text('🔥', style: TextStyle(fontSize: 22)),
-                            Positioned(
-                              top: 6,
-                              child: Text(
-                                '$dayNum',
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w900,
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFFC107),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '$dayNum',
+                              style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
                                   color: Colors.white,
-                                ),
                               ),
                             ),
-                          ],
+                          ),
                         )
                       else if (isToday)
                         Container(
-                          width: 26,
-                          height: 26,
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.primary, width: 2),
+                            color: Color.fromARGB(255, 209, 209, 209),
                             shape: BoxShape.circle,
                           ),
                           child: Center(
                             child: Text(
                               '$dayNum',
                               style: AppTextStyles.caption.copyWith(
-                                fontSize: 9,
+                                fontSize: 17,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
+                                color: const Color.fromARGB(255, 92, 92, 92),
                               ),
                             ),
                           ),
@@ -1153,7 +1556,7 @@ class _HomeTabState extends State<_HomeTab> {
                             child: Text(
                               '$dayNum',
                               style: AppTextStyles.caption.copyWith(
-                                fontSize: 9,
+                                fontSize: 17,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.textHint,
                               ),
@@ -1162,17 +1565,17 @@ class _HomeTabState extends State<_HomeTab> {
                         )
                       else
                         Container(
-                          width: 22,
-                          height: 22,
+                          width: 40,
+                          height: 40,
                           decoration: const BoxDecoration(
-                            color: Color(0xFFEAEAEA),
+                            color: Color.fromARGB(255, 255, 255, 255),
                             shape: BoxShape.circle,
                           ),
                           child: Center(
                             child: Text(
                               '$dayNum',
                               style: AppTextStyles.caption.copyWith(
-                                fontSize: 9,
+                                fontSize: 17,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.textSecondary,
                               ),
@@ -1256,7 +1659,7 @@ class _HomeTabState extends State<_HomeTab> {
                 ].map((val) => Text(
                   val,
                   style: AppTextStyles.caption.copyWith(
-                    fontSize: 9,
+                    fontSize: 17,
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1282,7 +1685,7 @@ class _HomeTabState extends State<_HomeTab> {
                             Text(
                               '$xpVal',
                               style: AppTextStyles.caption.copyWith(
-                                fontSize: 8,
+                                fontSize: 17,
                                 fontWeight: FontWeight.bold,
                                 color: isToday ? AppColors.primary : AppColors.textSecondary,
                               ),
@@ -1324,7 +1727,7 @@ class _HomeTabState extends State<_HomeTab> {
                           Text(
                             dayLabel,
                             style: AppTextStyles.caption.copyWith(
-                              fontSize: 9,
+                              fontSize: 17,
                               color: isToday ? AppColors.primary : AppColors.textSecondary,
                               fontWeight: isToday ? FontWeight.w900 : FontWeight.bold,
                             ),
@@ -1386,7 +1789,7 @@ class _HomeFriendRequests extends StatelessWidget {
                   child: const Icon(Icons.mail_rounded, color: AppColors.primary, size: 16),
                 ),
                 const SizedBox(width: 8),
-                Text('Permintaan Teman', style: AppTextStyles.h3),
+                Text('Permintaan Pertemanan', style: AppTextStyles.h3),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1411,7 +1814,7 @@ class _HomeFriendRequests extends StatelessWidget {
                 final data = docs[index].data();
                 final fromUid = data['from_uid'] as String? ?? data['uid'] as String? ?? '';
                 final fromName = data['from_name'] as String? ?? data['name'] as String? ?? 'Pengguna';
-                final fromAvatar = data['from_avatar'] as String? ?? data['avatar_url'] as String? ?? '🧑';
+                final fromAvatar = data['from_avatar'] as String? ?? data['avatar_url'] as String? ?? 'kinz.png';
                 final sentAt = data['sent_at'];
 
                 return Container(
@@ -1431,7 +1834,7 @@ class _HomeFriendRequests extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         child: Center(
-                          child: Text(fromAvatar, style: const TextStyle(fontSize: 20)),
+                          child: IconHandler.buildItemIcon(fromAvatar, size: 28),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1461,7 +1864,7 @@ class _HomeFriendRequests extends StatelessWidget {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('$fromName ditambahkan sebagai teman! 🎉'),
+                                content: Text('$fromName ditambahkan sebagai teman!'),
                                 backgroundColor: AppColors.success,
                                 behavior: SnackBarBehavior.floating,
                               ),
@@ -1489,3 +1892,5 @@ class _HomeFriendRequests extends StatelessWidget {
     );
   }
 }
+
+

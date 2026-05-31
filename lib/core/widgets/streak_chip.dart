@@ -18,7 +18,7 @@ class StreakChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('🔥', style: TextStyle(fontSize: 16)),
+          const Icon(Icons.whatshot_rounded, color: Colors.orange, size: 16),
           const SizedBox(width: 4),
           Text(
             '$streak',
@@ -49,7 +49,12 @@ class GemsChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('💎', style: TextStyle(fontSize: 16)),
+          Image.asset(
+            'assets/images/diamond.png',
+            width: 16,
+            height: 16,
+            fit: BoxFit.contain,
+          ),
           const SizedBox(width: 4),
           Text(
             '$gems',

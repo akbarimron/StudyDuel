@@ -43,7 +43,7 @@ class _SdButtonState extends State<SdButton> {
         SdButtonVariant.primary => AppColors.primaryDark,
         SdButtonVariant.secondary => AppColors.secondaryDark,
         SdButtonVariant.success => AppColors.successDark,
-        SdButtonVariant.outline => AppColors.border,
+        SdButtonVariant.outline => const Color.fromARGB(255, 255, 255, 255),
         SdButtonVariant.ghost => Colors.transparent,
       };
 

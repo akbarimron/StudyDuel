@@ -45,7 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (status.isGranted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Notifikasi diaktifkan! 🔔'),
+              content: Text('Notifikasi diaktifkan!'),
               behavior: SnackBarBehavior.floating,
               backgroundColor: AppColors.success,
             ),
@@ -81,7 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(
           children: [
-            const Text('🎓', style: TextStyle(fontSize: 28)),
+            const Icon(Icons.school_rounded, color: AppColors.primary, size: 28),
             const SizedBox(width: 12),
             Text('Cara Bermain', style: AppTextStyles.h3),
           ],
@@ -143,7 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(
           children: [
-            const Text('🔒', style: TextStyle(fontSize: 28)),
+            const Icon(Icons.lock_rounded, color: AppColors.primary, size: 28),
             const SizedBox(width: 12),
             Text('Akun & Privasi', style: AppTextStyles.h3),
           ],
@@ -170,7 +170,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(
           children: [
-            const Text('🔗', style: TextStyle(fontSize: 28)),
+            const Icon(Icons.link_rounded, color: AppColors.primary, size: 28),
             const SizedBox(width: 12),
             Text('Hubungkan Akun', style: AppTextStyles.h3),
           ],
@@ -207,7 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('ID Sekolah berhasil diverifikasi dan dihubungkan! 🏫'),
+                  content: Text('ID Sekolah berhasil diverifikasi dan dihubungkan!'),
                   backgroundColor: AppColors.success,
                   behavior: SnackBarBehavior.floating,
                 ),
@@ -254,7 +254,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(
           children: [
-            const Text('🧑‍💻', style: TextStyle(fontSize: 28)),
+            const Icon(Icons.person_outline_rounded, size: 28, color: AppColors.primary),
             const SizedBox(width: 12),
             Text('Ubah Profil', style: AppTextStyles.h3),
           ],
@@ -303,7 +303,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Profil berhasil diperbarui! 🎉'),
+                      content: Text('Profil berhasil diperbarui!'),
                       backgroundColor: AppColors.success,
                       behavior: SnackBarBehavior.floating,
                     ),
@@ -440,7 +440,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             setState(() => _darkModeEnabled = v);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Fitur Mode Gelap segera hadir! 🌓'),
+                                content: Text('Fitur Mode Gelap segera hadir!'),
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );

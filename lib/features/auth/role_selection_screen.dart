@@ -63,10 +63,12 @@ class RoleSelectionScreen extends StatelessWidget {
       body: Stack(
         children: [
           // Dekorasi bintang
-          const Positioned(top: 140, right: 24, child: Text('⭐', style: TextStyle(fontSize: 28))),
-          const Positioned(top: 220, left: 16, child: Text('⭐', style: TextStyle(fontSize: 18))),
-          const Positioned(bottom: 200, right: 32, child: Text('⭐', style: TextStyle(fontSize: 22))),
-          const Positioned(bottom: 280, left: 24, child: Text('⭐', style: TextStyle(fontSize: 16))),
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/welcome_bg.png',
+              fit: BoxFit.cover,
+            ),
+          ),
 
           SafeArea(
             child: Column(
@@ -74,19 +76,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 const SizedBox(height: 40),
 
                 // Karakter mascot
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('🧒', style: TextStyle(fontSize: 80))
-                        .animate()
-                        .slideX(begin: -0.3, duration: 500.ms, curve: Curves.easeOut),
-                    const SizedBox(width: 16),
-                    const Text('👧', style: TextStyle(fontSize: 80))
-                        .animate()
-                        .slideX(begin: 0.3, duration: 500.ms, curve: Curves.easeOut),
-                  ],
-                ),
+               
 
                 const SizedBox(height: 32),
 
@@ -114,16 +104,35 @@ class RoleSelectionScreen extends StatelessWidget {
                       const SizedBox(height: 14),
                       _RoleButton(
                         label: 'Orang tua',
-                        color: AppColors.primary,
+                        color: const Color.fromARGB(255, 156, 77, 77),
                         delay: 400,
-                        onTap: () => _confirmRole(context, UserRole.orangTua),
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Fitur Orang Tua segera hadir!')),
+                          );
+                        },
                       ),
                       const SizedBox(height: 14),
                       _RoleButton(
                         label: 'Guru',
-                        color: AppColors.primary,
-                        delay: 500,
-                        onTap: () => _confirmRole(context, UserRole.guru),
+                        color: const Color.fromARGB(255, 156, 77, 77),                        delay: 500,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Fitur Guru segera hadir!')),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '*Pilihan tidak dapat diubah',
+                          style: AppTextStyles.h1.copyWith(
+                            fontWeight: FontWeight.w100,
+                            fontSize: 12,
+                            color: AppColors.arts,
+                          ),
+                        ).animate().fadeIn(delay: 600.ms),
                       ),
                     ],
                   ),

@@ -3,13 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart' hide FirebaseService;
 import 'app.dart';
 import 'core/services/firebase_service.dart';
+import 'core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   try {
     await Firebase.initializeApp();
-    await FirebaseService().initializeDataIfNeeded();
+    await NotificationService().initialize();
+    FirebaseService().initializeDataIfNeeded();
   } catch (e) {
     debugPrint("Firebase default init error: $e. Attempting fallback with explicit options...");
     try {
@@ -23,6 +25,7 @@ void main() async {
           storageBucket: 'study-duel.firebasestorage.app',
         ),
       );
+      await NotificationService().initialize();
       await FirebaseService().initializeDataIfNeeded();
       debugPrint("Firebase successfully initialized via explicit options fallback.");
     } catch (fallbackError) {

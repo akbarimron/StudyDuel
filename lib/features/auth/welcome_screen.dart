@@ -55,75 +55,32 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // Dekorasi bintang
-          const Positioned(top: 100, right: 30, child: _Star(size: 28)),
-          const Positioned(top: 200, left: 20, child: _Star(size: 18)),
-          const Positioned(bottom: 260, right: 50, child: _Star(size: 22)),
-          const Positioned(bottom: 320, left: 40, child: _Star(size: 16)),
+          // Background Image yang baru
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/welcome_bg.png',
+              fit: BoxFit.cover,
+            ),
+          ),
 
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 60),
 
-                  // Karakter mascot area
-                  SizedBox(
-                    height: 240,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Karakter kiri
-                        Positioned(
-                          left: 0,
-                          bottom: 0,
-                          child: _MascotLeft()
-                              .animate()
-                              .slideX(begin: -0.3, duration: 600.ms, curve: Curves.easeOut),
-                        ),
-                        // Karakter kanan
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: _MascotRight()
-                              .animate()
-                              .slideX(begin: 0.3, duration: 600.ms, curve: Curves.easeOut),
-                        ),
-                        // Logo tengah
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: AppColors.secondary,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.secondary.withValues(alpha: 0.4),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
-                                  )
-                                ],
-                              ),
-                              child: Text(
-                                'STUDY\nDUEL',
-                                style: AppTextStyles.display.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 30,
-                                  height: 1.0,
-                                  letterSpacing: 1,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
-                        ).animate().scale(duration: 500.ms, delay: 200.ms, curve: Curves.elasticOut),
-                      ],
-                    ),
-                  ),
+                  // Area Logo
+                  Image.asset(
+                    'assets/images/studyDuel_logo.png',
+                    width: 70,
+                    height: 70,
+                    fit: BoxFit.contain,
+                  ).animate().fadeIn(duration: 600.ms).slideY(begin: -0.2),
+            
+                
+                  const SizedBox(height: 140),
 
                   const SizedBox(height: 32),
 
@@ -134,12 +91,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       fontWeight: FontWeight.w900,
                       fontSize: 32,
                     ),
+                    textAlign: TextAlign.left,
                   ).animate().fadeIn(delay: 400.ms),
                   const SizedBox(height: 6),
                   Text(
-                    'Selamat Datang Calon-Calon Pejuang!',
+                    'Selamat Datang Calon-Calon Pejuang!!',
                     style: AppTextStyles.bodyMedium,
-                    textAlign: TextAlign.center,
+                    textAlign: TextAlign.left,
                   ).animate().fadeIn(delay: 500.ms),
 
                   const SizedBox(height: 36),
@@ -178,38 +136,37 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     prefixIcon: Container(
                       width: 22,
                       height: 22,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Center(
-                        child: Text('G',
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.red)),
+                     
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: Image.asset(
+                          'assets/images/logo_google.png',
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                     onPressed: _loginWithGoogle,
                   ).animate().fadeIn(delay: 850.ms),
                   const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, AppRoutes.login),
-                    child: RichText(
-                      text: TextSpan(
-                        text: 'Lupa Password? ',
-                        style: AppTextStyles.bodySmall,
-                        children: [
-                          TextSpan(
-                            text: 'Masuk',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                              decoration: TextDecoration.underline,
+                  Center(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, AppRoutes.login),
+                      child: RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          text: 'Lupa Password? ',
+                          style: AppTextStyles.bodySmall,
+                          children: [
+                            TextSpan(
+                              text: 'Masuk',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: const Color.fromARGB(255, 28, 141, 247),
+                                fontWeight: FontWeight.w700,
+                                decoration: TextDecoration.underline,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ).animate().fadeIn(delay: 900.ms),
@@ -223,92 +180,4 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 }
 
-// ── Mascot widgets (placeholder artis karakter) ──────────────────────────────
 
-class _MascotLeft extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 90,
-          height: 110,
-          decoration: BoxDecoration(
-            color: AppColors.accentSurface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.accent, width: 2),
-          ),
-          child: const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('🧒', style: TextStyle(fontSize: 52)),
-              Text('⚔️', style: TextStyle(fontSize: 22)),
-            ],
-          ),
-        ),
-        Container(
-          width: 70,
-          height: 40,
-          decoration: const BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(20),
-              bottomRight: Radius.circular(20),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MascotRight extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 90,
-          height: 110,
-          decoration: BoxDecoration(
-            color: AppColors.secondarySurface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.secondary, width: 2),
-          ),
-          child: const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('👧', style: TextStyle(fontSize: 52)),
-              Text('📚', style: TextStyle(fontSize: 22)),
-            ],
-          ),
-        ),
-        Container(
-          width: 70,
-          height: 40,
-          decoration: const BoxDecoration(
-            color: AppColors.secondary,
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(20),
-              bottomRight: Radius.circular(20),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Star extends StatelessWidget {
-  final double size;
-  const _Star({required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text('⭐', style: TextStyle(fontSize: size))
-        .animate(onPlay: (c) => c.repeat(reverse: true))
-        .scale(duration: 1500.ms, begin: const Offset(0.8, 0.8), end: const Offset(1.1, 1.1));
-  }
-}
